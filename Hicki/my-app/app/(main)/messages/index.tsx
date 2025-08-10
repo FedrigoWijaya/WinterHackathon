@@ -1,35 +1,35 @@
+// app/(main)/messages/index.tsx
 import React, { useMemo, useState } from "react";
 import {
-  View, Text, StyleSheet, TextInput, Pressable,
-  useWindowDimensions, FlatList, ListRenderItemInfo,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  Pressable,
+  useWindowDimensions,
+  FlatList,
+  ListRenderItemInfo,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import BackHeader from "../../components/BackHeader";
-import { seedThreadsFor, CURRENT_USER_ID } from "../../lib/chat";
+import { CURRENT_USER_ID, seedThreadsFor, ThreadRow } from "../../lib/chat";
 import { router } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const GREEN = "#0F4D3A";
 const MAX_W = 520;
-
-type Row = ReturnType<typeof seedThreadsFor>[number];
+const TABBAR_SPACE = 110;
 
 export default function MessagesScreen() {
-  const inset = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const [q, setQ] = useState("");
   const containerW = Math.min(width, MAX_W);
   const CONTENT_W = Math.min(containerW - 32, 420);
-  const BOTTOM_PAD = inset.bottom + 16;
 
-  const [q, setQ] = useState("");
-
-  const threads = useMemo(() => {
-    const rows = seedThreadsFor(CURRENT_USER_ID);
-    if (!q.trim()) return rows;
+  const rows = useMemo(() => {
+    const base = seedThreadsFor(CURRENT_USER_ID);
+    if (!q.trim()) return base;
     const s = q.toLowerCase();
-    return rows.filter(
-      (r) => r.name.toLowerCase().includes(s) || r.last.toLowerCase().includes(s)
-    );
+    return base.filter((r) => r.name.toLowerCase().includes(s) || r.last.toLowerCase().includes(s));
   }, [q]);
 
   const Header = () => (
@@ -51,7 +51,7 @@ export default function MessagesScreen() {
     </View>
   );
 
-  const renderItem = ({ item }: ListRenderItemInfo<Row>) => (
+  const renderItem = ({ item }: ListRenderItemInfo<ThreadRow>) => (
     <View style={[s.inner, { width: CONTENT_W }]}>
       <Pressable style={s.row} onPress={() => router.push(`/messages/${item.id}`)}>
         <View style={[s.avatar, { backgroundColor: item.color }]} />
@@ -65,13 +65,13 @@ export default function MessagesScreen() {
 
   return (
     <FlatList
-      data={threads}
+      data={rows}
       keyExtractor={(it) => it.id}
       renderItem={renderItem}
       ListHeaderComponent={Header}
       stickyHeaderIndices={[0]}
-      contentContainerStyle={{ paddingBottom: BOTTOM_PAD, backgroundColor: "#fff" }}
-      scrollIndicatorInsets={{ bottom: BOTTOM_PAD }}
+      contentContainerStyle={{ paddingBottom: TABBAR_SPACE, backgroundColor: "#fff" }}
+      scrollIndicatorInsets={{ bottom: TABBAR_SPACE }}
     />
   );
 }

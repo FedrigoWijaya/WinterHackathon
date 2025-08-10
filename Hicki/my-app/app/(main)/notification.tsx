@@ -1,12 +1,14 @@
 // app/(main)/notification.tsx
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
-  ScrollView,
-  StyleSheet,
   Pressable,
+  StyleSheet,
   useWindowDimensions,
+  FlatList,
+  ListRenderItemInfo,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -14,26 +16,25 @@ const GREEN = "#0F4D3A";
 const ORANGE = "#F48C04";
 const TEXT_MUTE = "#D6EFE7";
 
-// spacing constants
-const CARD_GAP = 20;     // gap between cards
-const MAX_W = 520;       // page max width on web
+const CARD_GAP = 20;
+const MAX_W = 520;
 const TABBAR_SPACE = 110;
 
 type NAction = "navigate" | "approve" | null;
-
-const ITEMS: {
+type NItem = {
   id: string;
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   body: string;
   action: NAction;
-}[] = [
+};
+
+const ITEMS: NItem[] = [
   {
     id: "1",
     icon: "time-outline",
     title: "Pick-up reminder",
-    body:
-      "Your reserved sandwiches expire in 45 minutes!\nMoon Cafe - 123 George St",
+    body: "Your reserved sandwiches expire in 45 minutes!\nMoon Cafe - 123 George St",
     action: "navigate",
   },
   {
@@ -60,56 +61,81 @@ const ITEMS: {
 ];
 
 export default function NotificationScreen() {
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const [data, setData] = useState<NItem[]>(ITEMS);
 
   const containerW = Math.min(width, MAX_W);
-  const CONTENT_W = Math.min(containerW - 32, 360); // centered inner column
+  const CONTENT_W = Math.min(containerW - 32, 360);
+
+  const dismiss = (id: string) => setData((prev) => prev.filter((n) => n.id !== id));
+
+  const Header = () => (
+    <View style={s.headerWrap}>
+      <View style={[s.headerInner, { width: CONTENT_W }]}>
+        <Text style={s.h1}>Notifications</Text>
+      </View>
+    </View>
+  );
+
+  const renderItem = ({ item, index }: ListRenderItemInfo<NItem>) => (
+    <View style={{ width: CONTENT_W, alignSelf: "center" }}>
+      <View style={[s.card, index !== data.length - 1 && { marginBottom: CARD_GAP }]}>
+        <View style={s.headerRow}>
+          <Ionicons name={item.icon} size={22} color={TEXT_MUTE} />
+          <Text style={s.cardTitle}>{item.title}</Text>
+        </View>
+
+        <Text style={s.cardBody}>{item.body}</Text>
+
+        {item.action === "navigate" && (
+          <View style={s.actionsRow}>
+            <Pill
+              label="Navigate"
+              onPress={() => {
+                Alert.alert("Demo", "Pretend we navigated 👍");
+                dismiss(item.id);
+              }}
+            />
+          </View>
+        )}
+
+        {item.action === "approve" && (
+          <View style={[s.actionsRow, { gap: 10 }]}>
+            <Pill
+              label="Approve"
+              onPress={() => {
+                Alert.alert("Approved ✅");
+                dismiss(item.id);
+              }}
+            />
+            <Pill
+              label="Decline"
+              variant="outline"
+              onPress={() => {
+                Alert.alert("Declined ❌");
+                dismiss(item.id);
+              }}
+            />
+          </View>
+        )}
+      </View>
+    </View>
+  );
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{ paddingBottom: TABBAR_SPACE }}
-    >
-      {/* vertically center when content is short */}
-      <View style={[styles.centerWrap, { minHeight: height - TABBAR_SPACE }]}>
-        <View style={[styles.container, { maxWidth: MAX_W }]}>
-          <Text style={styles.h1}>Notifications</Text>
-
-          {/* centered inner column */}
-          <View style={[styles.col, { width: CONTENT_W }]}>
-            {ITEMS.map((n, i) => (
-              <View
-                key={n.id}
-                style={[
-                  styles.card,
-                  i !== ITEMS.length - 1 && { marginBottom: CARD_GAP },
-                ]}
-              >
-                <View style={styles.headerRow}>
-                  <Ionicons name={n.icon} size={22} color={TEXT_MUTE} />
-                  <Text style={styles.cardTitle}>{n.title}</Text>
-                </View>
-
-                <Text style={styles.cardBody}>{n.body}</Text>
-
-                {n.action === "navigate" && (
-                  <View style={styles.actionsRow}>
-                    <Pill label="Navigate" onPress={() => {}} />
-                  </View>
-                )}
-
-                {n.action === "approve" && (
-                  <View style={[styles.actionsRow, { gap: 10 }]}>
-                    <Pill label="Approve" onPress={() => {}} />
-                    <Pill label="Decline" variant="outline" onPress={() => {}} />
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-    </ScrollView>
+    <FlatList
+      data={data}
+      keyExtractor={(it) => it.id}
+      renderItem={renderItem}
+      ListHeaderComponent={Header}
+      stickyHeaderIndices={[0]}            // <- keeps header pinned
+      contentContainerStyle={{
+        paddingBottom: TABBAR_SPACE,
+        alignItems: "center",
+        backgroundColor: "#fff",
+      }}
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
@@ -127,44 +153,35 @@ function Pill({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        styles.pill,
+        s.pill,
         solid
           ? { backgroundColor: ORANGE }
           : { backgroundColor: "transparent", borderWidth: 2, borderColor: ORANGE },
         pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 },
       ]}
     >
-      <Text style={[styles.pillText, solid ? { color: "#fff" } : { color: ORANGE }]}>
-        {label}
-      </Text>
+      <Text style={[s.pillText, solid ? { color: "#fff" } : { color: ORANGE }]}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff" },
-
-  centerWrap: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
+const s = StyleSheet.create({
+  headerWrap: {
+    backgroundColor: "#fff",
     paddingTop: 8,
-  },
-
-  container: {
-    alignSelf: "center",
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF3F0",
     width: "100%",
-    paddingHorizontal: 16,
+    alignItems: "center",
   },
-
-  col: { alignSelf: "center" },
-
-  h1: { fontSize: 24, fontWeight: "700", color: GREEN, marginBottom: 14 },
+  headerInner: { alignSelf: "center" },
+  h1: { fontSize: 24, fontWeight: "700", color: GREEN },
 
   card: {
     backgroundColor: GREEN,
     borderRadius: 20,
-    padding: 18, // a bit more inner padding
+    padding: 18,
   },
   headerRow: {
     flexDirection: "row",
@@ -181,7 +198,7 @@ const styles = StyleSheet.create({
   cardBody: { color: "#EAF7F2", marginTop: 12, lineHeight: 18 },
 
   actionsRow: {
-    marginTop: 14, // extra space above buttons
+    marginTop: 14,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",

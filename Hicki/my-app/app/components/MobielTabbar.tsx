@@ -1,24 +1,19 @@
+// app/components/MobielTabbar.tsx
 import React from "react";
 import { View, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const GREEN = "#0F4D3A";
 const ORANGE = "#F48C04";
-const BAR_H = 72;
 
-export default function MobielTabbar({ state, navigation }: BottomTabBarProps) {
-  const pathname = usePathname();
+export default function MobileTabBar({ state, navigation }: BottomTabBarProps) {
   const inset = useSafeAreaInsets();
+  const current = state.routes[state.index]?.name || "";
+  // hide on messages list and chat
+  if (current.startsWith("messages")) return null;
 
-  // Hide on messages list and any chat thread
-  // Works whether the route is "/messages" or "/(main)/messages/..."
-  const hideOnMessages = /^\/(?:\([^/]+\)\/)?messages(?:\/|$)/.test(pathname);
-  if (hideOnMessages) return null;
-
-  const active = state.routes[state.index]?.name;
   const go = (name: string) => navigation.navigate(name as never);
 
   return (
@@ -26,8 +21,8 @@ export default function MobielTabbar({ state, navigation }: BottomTabBarProps) {
       <View
         style={{
           marginHorizontal: 16,
-          marginBottom: inset.bottom + 10,
-          height: BAR_H,
+          marginBottom: 10 + inset.bottom,
+          height: 72,
           backgroundColor: GREEN,
           borderRadius: 999,
           flexDirection: "row",
@@ -39,22 +34,15 @@ export default function MobielTabbar({ state, navigation }: BottomTabBarProps) {
         }}
       >
         <Slot>
-          <IconBtn
-            onPress={() => go("index")}
-            name="home-outline"
-            focused={active === "index"}
-          />
+          <IconBtn onPress={() => go("index")} name="home-outline" focused={current === "index"} />
         </Slot>
-
         <Slot>
           <IconBtn
             onPress={() => go("explore")}
             name="search-outline"
-            focused={active === "explore"}
+            focused={current === "explore"}
           />
         </Slot>
-
-        {/* Center "+" button */}
         <Slot>
           <Pressable
             onPress={() => go("upload")}
@@ -70,20 +58,18 @@ export default function MobielTabbar({ state, navigation }: BottomTabBarProps) {
             <Ionicons name="add" size={28} color="#fff" />
           </Pressable>
         </Slot>
-
         <Slot>
           <IconBtn
             onPress={() => go("notification")}
             name="notifications-outline"
-            focused={active === "notification"}
+            focused={current === "notification"}
           />
         </Slot>
-
         <Slot>
           <IconBtn
             onPress={() => go("profile")}
             name="person-outline"
-            focused={active === "profile"}
+            focused={current === "profile"}
           />
         </Slot>
       </View>
@@ -92,11 +78,7 @@ export default function MobielTabbar({ state, navigation }: BottomTabBarProps) {
 }
 
 function Slot({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-      {children}
-    </View>
-  );
+  return <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>{children}</View>;
 }
 
 function IconBtn({

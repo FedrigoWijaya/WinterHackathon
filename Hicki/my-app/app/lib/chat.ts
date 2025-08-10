@@ -1,59 +1,41 @@
-// Canonical helpers for chat IDs + demo data.
-// All screens must use *this* pairId to avoid mismatched threads.
-
-import type { Router } from "expo-router";
-
+// app/lib/chat.ts
 export const GREEN = "#0F4D3A";
-export const CURRENT_USER_ID = "u_me"; // swap with your real auth user id
+export const CURRENT_USER_ID = "u_me";
 
-// ONE thread per pair of users -> deterministic id
-export function pairId(a: string, b: string) {
-  return [a, b].sort().join("__"); // e.g. "u_me__u_otti"
-}
+export const slug = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
-// Known users (for nice titles/avatars)
-export const USERS: Record<string, { name: string; color: string }> = {
-  u_me:     { name: "You",        color: "#CFCFCF" },
-  u_otti:   { name: "Otti Cafe",  color: "#CFCFCF" },
-  u_figo:   { name: "Mr.Figo",    color: GREEN     },
-  u_bella:  { name: "Bella Deli", color: "#F48C04" },
-  u_market: { name: "Urban Market", color: "#8E9A9B" },
-};
+export const idForName = (name: string) => `u_${slug(name)}`;
 
-// Given a thread id "A__B", return the *other* user's label
-export function threadTitleFromId(id: string, me: string = CURRENT_USER_ID) {
-  const [a, b] = id.split("__");
-  const other = a === me ? b : b === me ? a : b; // fallback: b
-  return USERS[other]?.name ?? other;
+/** Show a sensible title even if the id is not seeded */
+export function threadTitleFromId(id: string, meId = CURRENT_USER_ID) {
+  if (!id) return "Chat";
+  if (id === meId) return "Me";
+  // strip u_
+  const raw = id.replace(/^u_/, "");
+  // prettify: "otti_cafe" -> "Otti Cafe"
+  return raw
+    .split("_")
+    .map((p) => (p ? p[0].toUpperCase() + p.slice(1) : ""))
+    .join(" ")
+    .trim();
 }
 
 export type ThreadRow = {
   id: string;
   name: string;
   last: string;
-  color: string; // avatar color
+  color: string;
 };
 
-// Seed list for Messages screen (one row per contact)
-export function seedThreadsFor(me: string): ThreadRow[] {
-  const contacts = ["u_otti", "u_figo", "u_bella", "u_market"];
-  const lastLines = [
-    "Hi",
-    "Are you available today?",
-    "Thanks!",
-    "See you soon",
-  ];
-  return contacts.map((uid, i) => ({
-    id: pairId(me, uid),
-    name: USERS[uid]?.name ?? uid,
-    last: `${USERS[uid]?.name ?? uid} : ${lastLines[i % lastLines.length]}`,
-    color: USERS[uid]?.color ?? "#CFCFCF",
-  }));
-}
+const COLORS = ["#0F4D3A", "#F48C04", "#A1BFB3", "#5F8F7D", "#8FB8A8"];
 
-// Convenience: open or create a thread (client-side nav only here)
-export function openThreadWith(router: Router, me: string, other: string) {
-  const id = pairId(me, other);
-  // TODO: call your backend to ensure the thread doc exists, if needed
-  router.push(`/messages/${id}`);
+export function seedThreadsFor(_: string): ThreadRow[] {
+  const names = ["Otti Cafe", "Mr.Figo", "Market", "Cafe Uno", "Jeni"];
+  return names.map((n, i) => ({
+    id: idForName(n),
+    name: n,
+    last: i === 0 ? "Hi" : "Hi there!",
+    color: COLORS[i % COLORS.length],
+  }));
 }

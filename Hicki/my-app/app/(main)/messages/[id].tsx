@@ -1,3 +1,4 @@
+// app/(main)/messages/[id].tsx
 import React, { useMemo, useRef, useState } from "react";
 import {
   View,
@@ -10,20 +11,20 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import BackHeader from "../../components/BackHeader";
+import { useLocalSearchParams } from "expo-router";
 import { CURRENT_USER_ID, threadTitleFromId } from "../../lib/chat";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const GREEN = "#0F4D3A";
 const MAX_W = 520;
+const TOOLBAR_H = 58;
 
 type Msg = { id: string; from: string; text: string };
 
 const SAMPLE: Msg[] = [
-  { id: "1", from: "u_otti", text: "Hi there!" },
+  { id: "1", from: "u_otti_cafe", text: "Hi there!" },
   { id: "2", from: CURRENT_USER_ID, text: "Hello! How can I help?" },
 ];
 
@@ -35,10 +36,7 @@ export default function ChatThread() {
   const containerW = Math.min(width, MAX_W);
   const CONTENT_W = Math.min(containerW - 32, 420);
 
-  const title = useMemo(
-    () => threadTitleFromId(id ?? "", CURRENT_USER_ID),
-    [id]
-  );
+  const title = useMemo(() => threadTitleFromId(id ?? "", CURRENT_USER_ID), [id]);
 
   const [text, setText] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>(SAMPLE);
@@ -52,19 +50,15 @@ export default function ChatThread() {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   };
 
-  // iOS will lift the bottom bar from the safe-area bottom
-  const KEYBOARD_OFFSET = inset.bottom;
-
-  // Height of the compact input row
-  const INPUT_H = 44;
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.select({ ios: "padding", android: undefined })}
-      style={{ flex: 1, backgroundColor: "#fff", alignItems: "center" }}
-      keyboardVerticalOffset={KEYBOARD_OFFSET}
+      // offset by top inset so the header doesn't get pushed too much on iOS
+      keyboardVerticalOffset={inset.top}
+      style={s.screen}
     >
-      <View style={{ width: "100%", alignItems: "center" }}>
+      {/* IMPORTANT: this wrapper must be flex:1 so the toolbar anchors to the screen bottom */}
+      <View style={s.root}>
         {/* Header */}
         <View style={s.headerWrap}>
           <View style={[s.inner, { width: CONTENT_W }]}>
@@ -75,13 +69,15 @@ export default function ChatThread() {
         {/* Messages */}
         <ScrollView
           ref={scrollRef}
+          style={s.scroller}
           contentContainerStyle={{
-            paddingTop: 8,
-            // Leave space for the compact input + safe area
-            paddingBottom: inset.bottom + INPUT_H + 12,
             alignItems: "center",
+            paddingTop: 8,
+            // leave space so last bubble isn't hidden under the toolbar
+            paddingBottom: inset.bottom + TOOLBAR_H + 8,
           }}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          showsVerticalScrollIndicator={false}
         >
           <View style={[s.inner, { width: CONTENT_W }]}>
             <View style={{ gap: 10 }}>
@@ -104,29 +100,23 @@ export default function ChatThread() {
           </View>
         </ScrollView>
 
-        {/* Bottom input (compact with inline send), pinned to safe-area bottom */}
-        <View
-          style={[
-            s.toolbar,
-            Platform.OS === "web" && { position: "fixed", left: 0, right: 0 }, // keep flush on web
-            { paddingBottom: inset.bottom },
-          ]}
-        >
-          <View style={[s.inner, { width: CONTENT_W }]}>
-            <View style={s.inputInlineWrap}>
+        {/* Composer pinned at the very bottom */}
+        <View style={[s.toolbar, { paddingBottom: inset.bottom }]}>
+          <View style={[s.inner, { width: CONTENT_W, flexDirection: "row", gap: 10 }]}>
+            <View style={s.inputWrap}>
               <TextInput
                 placeholder="Type a message..."
                 placeholderTextColor="#7c9c92"
-                style={s.inputInline}
+                style={s.input}
                 value={text}
                 onChangeText={setText}
                 returnKeyType="send"
                 onSubmitEditing={onSend}
               />
-              <Pressable onPress={onSend} style={s.inlineSend}>
-                <Ionicons name="send" size={16} color="#fff" />
-              </Pressable>
             </View>
+            <Pressable onPress={onSend} style={s.sendFab}>
+              <Ionicons name="send" size={18} color="#fff" />
+            </Pressable>
           </View>
         </View>
       </View>
@@ -135,24 +125,30 @@ export default function ChatThread() {
 }
 
 const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#fff" },
+  // fills screen → absolute toolbar uses this as anchor
+  root: { flex: 1, width: "100%", alignItems: "center" },
+
   headerWrap: {
     backgroundColor: "#fff",
     paddingTop: 8,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#EFEFEF",
+    width: "100%",
+    alignItems: "center",
   },
+  scroller: { flex: 1, width: "100%" },
+
   inner: { alignSelf: "center" },
 
-  // message bubbles
   bubble: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, maxWidth: "80%" },
   me: { backgroundColor: GREEN },
   them: { backgroundColor: "#EAF5F0" },
   text: { color: GREEN },
 
-  // bottom bar container
   toolbar: {
-    position: "absolute", // becomes 'fixed' on web via JSX
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
@@ -160,32 +156,25 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#EEF1EE",
     paddingTop: 8,
-    // no fixed height; the compact input dictates the height
-  },
-
-  // compact inline input + send button
-  inputInlineWrap: {
-    position: "relative",
-    height: 44,
+    height: TOOLBAR_H,
     justifyContent: "center",
+    alignItems: "center",
   },
-  inputInline: {
+  inputWrap: {
+    flex: 1,
     height: 44,
     borderWidth: 2,
     borderColor: GREEN,
     borderRadius: 999,
-    paddingLeft: 12,
-    paddingRight: 48, // room for send button
-    color: GREEN,
+    paddingHorizontal: 12,
+    justifyContent: "center",
     backgroundColor: "#fff",
   },
-  inlineSend: {
-    position: "absolute",
-    right: 4,
-    top: 4,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  input: { color: GREEN, paddingVertical: 0 },
+  sendFab: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: GREEN,
     alignItems: "center",
     justifyContent: "center",

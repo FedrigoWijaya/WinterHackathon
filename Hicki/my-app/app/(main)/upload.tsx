@@ -1,4 +1,3 @@
-// app/(main)/upload.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -7,125 +6,157 @@ import {
   Pressable,
   TextInput,
   Image,
-  useWindowDimensions,
   ScrollView,
+  useWindowDimensions,
+  Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import { addItem, type Category, type ItemType } from "../lib/items";
 
 const GREEN = "#0F4D3A";
 const ORANGE = "#F48C04";
 const BEIGE = "#F4EFE8";
+const MAX_W = 520;
+const TABBAR_SPACE = 110;
 
-const CATS = ["Kerbside", "Food", "Non-food"] as const;
+const CATS: Category[] = ["Kerbside", "Food", "Non-food"];
 
 export default function Upload() {
-  const { width, height } = useWindowDimensions();
-
-  const MAX_W = 520;                           // page max width
+  const { width } = useWindowDimensions();
+  const router = useRouter();
   const containerW = Math.min(width, MAX_W);
-  const CONTENT_W = Math.min(containerW - 32, 360); // centered inner column
-  const TABBAR_SPACE = 110;                    // space for your rounded tab bar
 
-  const [cat, setCat] = useState<(typeof CATS)[number]>("Kerbside");
+  const [cat, setCat] = useState<Category>("Kerbside");
+  const [type, setType] = useState<ItemType>("free"); // you can expose a switch if needed
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const [qty, setQty] = useState(0);
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [stock, setStock] = useState(0);
+  const [uri, setUri] = useState<string | null>(null);
+
+  async function pickImage() {
+    // ask once (no-op on web)
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted" && status !== "limited") {
+      Alert.alert("Permission needed", "Please allow access to your photos.");
+      return;
+    }
+
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+
+    if (!res.canceled && res.assets?.length) {
+      setUri(res.assets[0].uri);
+    }
+  }
+
+  async function onUpload() {
+    if (!uri) return Alert.alert("Add photo", "Please choose a photo first.");
+    if (!title.trim()) return Alert.alert("Missing title", "Please add a title.");
+
+    const id = await addItem({
+      type,
+      category: cat,
+      title: title.trim(),
+      description: desc.trim(),
+      image: uri,
+      stockLeft: stock,
+    });
+
+    Alert.alert("Uploaded!", "Your item has been added.", [
+      { text: "OK", onPress: () => router.push("/(main)/items") },
+    ]);
+  }
 
   return (
-    <ScrollView
-      style={s.screen}
-      contentContainerStyle={{ paddingBottom: TABBAR_SPACE }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={[s.centerWrap, { minHeight: height - TABBAR_SPACE }]}>
-        <View style={[s.container, { maxWidth: MAX_W }]}>
-          {/* Chips */}
-          <View style={[s.col, { width: CONTENT_W }]}>
-            <View style={s.chipsRow}>
-              {CATS.map((c) => {
-                const active = c === cat;
-                return (
-                  <Pressable
-                    key={c}
-                    onPress={() => setCat(c)}
-                    style={[s.chip, { backgroundColor: active ? GREEN : BEIGE }]}
-                  >
-                    <Text style={{ color: active ? "#fff" : GREEN, fontWeight: "700" }}>
-                      {c}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: TABBAR_SPACE }}>
+      <View style={[s.container, { maxWidth: MAX_W }]}>
+        {/* Category chips */}
+        <View style={[s.row, { paddingHorizontal: 16, paddingTop: 10 }]}>
+          {CATS.map((c) => {
+            const active = c === cat;
+            return (
+              <Pressable
+                key={c}
+                onPress={() => setCat(c)}
+                style={[s.chip, { backgroundColor: active ? GREEN : BEIGE }]}
+              >
+                <Text style={{ color: active ? "#fff" : GREEN, fontWeight: "800" }}>
+                  {c}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Upload box */}
+        <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+          <Pressable
+            onPress={pickImage}
+            style={[
+              s.uploadBox,
+              { width: containerW - 32, height: 280, borderRadius: 24 },
+            ]}
+          >
+            {uri ? (
+              <Image source={{ uri }} style={{ width: "100%", height: "100%", borderRadius: 24 }} />
+            ) : (
+              <View style={{ alignItems: "center" }}>
+                <Text style={{ color: GREEN, fontWeight: "800" }}>Upload photo</Text>
+                <Text style={{ color: GREEN, opacity: 0.75, marginTop: 6 }}>
+                  Tap to choose from your library
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
+
+        {/* Title + Stock */}
+        <View style={[s.rowWrap, { paddingHorizontal: 16, marginTop: 16 }]}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={s.label}>Title</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder=""
+              style={s.input}
+              placeholderTextColor="#7c9c92"
+            />
+          </View>
+
+          <View style={{ width: 120 }}>
+            <Text style={s.label}>Stock</Text>
+            <View style={s.stepper}>
+              <Pressable onPress={() => setStock((n) => Math.max(0, n - 1))} style={s.stepperBtn}>
+                <Text style={s.stepperText}>−</Text>
+              </Pressable>
+              <Text style={[s.stepperText, { minWidth: 22, textAlign: "center" }]}>{stock}</Text>
+              <Pressable onPress={() => setStock((n) => n + 1)} style={s.stepperBtn}>
+                <Text style={s.stepperText}>+</Text>
+              </Pressable>
             </View>
           </View>
+        </View>
 
-          {/* Upload area */}
-          <View style={[s.col, { width: CONTENT_W, marginTop: 12 }]}>
-            <Pressable
-              onPress={() =>
-                setImageUri((u) =>
-                  u
-                    ? null
-                    : "https://images.unsplash.com/photo-1616401784845-180882ba9ba4?auto=format&fit=crop&w=1200&q=60"
-                )
-              }
-              style={[s.uploadBox, { height: 280 }]}
-            >
-              {imageUri ? (
-                <Image source={{ uri: imageUri }} style={s.uploadImage} />
-              ) : (
-                <View style={{ alignItems: "center" }}>
-                  <Ionicons name="cloud-upload-outline" size={28} color={GREEN} />
-                  <Text style={{ marginTop: 8, color: GREEN, fontWeight: "700" }}>
-                    Upload photo
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-          </View>
+        {/* Description */}
+        <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+          <Text style={s.label}>Description</Text>
+          <TextInput
+            value={desc}
+            onChangeText={setDesc}
+            placeholder=""
+            style={[s.input, { height: 44 }]}
+            placeholderTextColor="#7c9c92"
+          />
+        </View>
 
-          {/* Title + Stock */}
-          <View style={[s.col, { width: CONTENT_W, marginTop: 16 }]}>
-            <View style={[s.row, { gap: 12 }]}>
-              <View style={[s.inputWrap, { flex: 1 }]}>
-                <Text style={s.label}>Title</Text>
-                <TextInput value={title} onChangeText={setTitle} style={s.input} />
-              </View>
-
-              <View style={{ width: 124 }}>
-                <Text style={s.label}>Stock</Text>
-                <View style={s.stepper}>
-                  <Pressable onPress={() => setQty((q) => Math.max(0, q - 1))} style={s.stepperBtn}>
-                    <Text style={s.stepperText}>−</Text>
-                  </Pressable>
-                  <Text style={[s.stepperText, { minWidth: 22, textAlign: "center" }]}>{qty}</Text>
-                  <Pressable onPress={() => setQty((q) => q + 1)} style={s.stepperBtn}>
-                    <Text style={s.stepperText}>+</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Description */}
-          <View style={[s.col, { width: CONTENT_W, marginTop: 12 }]}>
-            <Text style={s.label}>Description</Text>
-            <TextInput value={desc} onChangeText={setDesc} style={[s.input, { height: 44 }]} />
-          </View>
-
-          {/* Upload button — wider */}
-          <View style={[s.col, { width: CONTENT_W, marginTop: 18 }]}>
-            <Pressable
-              onPress={() => console.log({ cat, title, desc, qty, imageUri })}
-              style={({ pressed }) => [
-                s.cta,
-                pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
-              ]}
-            >
-              <Text style={{ color: "#fff", fontWeight: "800" }}>Upload</Text>
-            </Pressable>
-          </View>
+        {/* Upload button */}
+        <View style={{ paddingHorizontal: 16, marginTop: 18, marginBottom: 10 }}>
+          <Pressable onPress={onUpload} style={({ pressed }) => [s.cta, pressed && { opacity: 0.9 }]}>
+            <Text style={{ color: "#fff", fontWeight: "900" }}>Upload</Text>
+          </Pressable>
         </View>
       </View>
     </ScrollView>
@@ -134,49 +165,32 @@ export default function Upload() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#fff" },
+  container: { alignSelf: "center", width: "100%" },
+  row: { flexDirection: "row", alignItems: "center", gap: 12 },
+  rowWrap: { flexDirection: "row", alignItems: "center" },
 
-  centerWrap: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 8,
-  },
-
-  container: {
-    alignSelf: "center",
-    width: "100%",
-    paddingHorizontal: 16,
-  },
-
-  col: { alignSelf: "center" },
-  row: { flexDirection: "row", alignItems: "center" },
-
-  chipsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between", // spread evenly
-    gap: 12,
-  },
   chip: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 999,
-    minWidth: 110,
-    alignItems: "center",
+    marginRight: 12,
   },
 
   uploadBox: {
     backgroundColor: BEIGE,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 24,
-    width: "100%",
+    borderWidth: 2,
+    borderColor: GREEN,
   },
-  uploadImage: { width: "100%", height: "100%", borderRadius: 24 },
 
-  label: { color: GREEN, fontSize: 12, fontWeight: "700", marginBottom: 6 },
+  label: {
+    color: GREEN,
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
 
-  inputWrap: {},
   input: {
     height: 44,
     borderWidth: 2,
@@ -204,15 +218,12 @@ const s = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: BEIGE,
   },
-  stepperText: { color: GREEN, fontWeight: "800", fontSize: 16 },
+  stepperText: { color: GREEN, fontWeight: "900", fontSize: 16 },
 
-  // Wider Upload button; set to '100%' if you want full-column width
   cta: {
     height: 48,
-    width: 240,                 // <— wider
     backgroundColor: ORANGE,
     borderRadius: 999,
-    alignSelf: "center",
     alignItems: "center",
     justifyContent: "center",
   },
